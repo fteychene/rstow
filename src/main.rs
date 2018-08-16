@@ -63,10 +63,26 @@ main!(|args: Cli, log_level: verbosity| {
     let target = fs::canonicalize(&args.target).expect("Unresolved absolute target path");
 
     info!("Stow from Source {:?} to target {:?}", source.display(), target.display());
-    visit_sync(source.as_path(), target.as_path(), *dryrun, *force, *backup, *unstow).expect("An error occurred when visiting directories") ;
+
+//    let mut operations: LinkedList<FSOperation> = LinkedList::new();
+    visit_run_sync(source.as_path(), target.as_path(), *dryrun, *force, *backup, *unstow).expect("An error occurred when visiting directories") ;
+//    apply(operations.borrow_mut(), *dryrun).expect("An error occurred when runing operation")
 });
 
-fn visit_sync(source: &Path, target: &Path, dryrun: bool, force: bool, backup: bool, unstow: bool)-> io::Result<()> {
+fn visit(source: &Path, target: &Path, dryrun: bool, force: bool, backup: bool, unstow: bool, operations: LinkedList<FSOperation>) -> LinkedList<io::Result<FSOperation>> {
+
+    if source.is_dir() {
+        let source_paths = fs::read_dir(source).unwrap();
+        for src_dir_entry in source_paths {
+
+        }
+
+    } else {
+
+    }
+}
+
+fn visit_run_sync(source: &Path, target: &Path, dryrun: bool, force: bool, backup: bool, unstow: bool) -> io::Result<()> {
     let source_paths = fs::read_dir(source).unwrap();
 
     let mut operations: LinkedList<FSOperation> = LinkedList::new();
@@ -79,7 +95,6 @@ fn visit_sync(source: &Path, target: &Path, dryrun: bool, force: bool, backup: b
             if unstow {
                 unstow::unstow_path(path.as_path(), target_file_path.as_path(), operations.borrow_mut())
             } else {
-                //handle
                 stow::stow_path(path.as_path(), target_file_path.as_path(), force, backup, operations.borrow_mut())
             }
         };
@@ -88,7 +103,7 @@ fn visit_sync(source: &Path, target: &Path, dryrun: bool, force: bool, backup: b
             Ok(TraversOperation::StopPathRun) => (),
             Ok(TraversOperation::Continue) =>
                 if path.as_path().is_dir() {
-                    visit_sync(path.as_path(), target_file_path.as_path(), dryrun, force, backup, unstow);
+                    visit_run_sync(path.as_path(), target_file_path.as_path(), dryrun, force, backup, unstow);
                 },
             Err(e) => error!("{}", e)
         }
@@ -101,3 +116,13 @@ fn visit_sync(source: &Path, target: &Path, dryrun: bool, force: bool, backup: b
     }
     Ok(())
 }
+
+
+//fn apply(mut operations: LinkedList<FSOperation>, dryrun: bool) {
+//    if dryrun {
+//        interpreters::dryrun_interpreter(operations.borrow());
+//    } else {
+//        interpreters::filesystem_interpreter(operations.borrow());
+//    }
+//    Ok(())
+//}
