@@ -7,9 +7,7 @@ use quicli::prelude::*;
 use std::io;
 use std::io::{Error, ErrorKind};
 use std::fs::{self};
-use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::os::unix::fs::symlink;
 use std::collections::LinkedList;
 use std::borrow::BorrowMut;
 use std::borrow::Borrow;
@@ -65,24 +63,33 @@ main!(|args: Cli, log_level: verbosity| {
     info!("Stow from Source {:?} to target {:?}", source.display(), target.display());
 
 //    let mut operations: LinkedList<FSOperation> = LinkedList::new();
-    visit_run_sync(source.as_path(), target.as_path(), *dryrun, *force, *backup, *unstow).expect("An error occurred when visiting directories") ;
+    visit_and_apply(source.as_path(), target.as_path(), *dryrun, *force, *backup, *unstow).expect("An error occurred when visiting directories") ;
 //    apply(operations.borrow_mut(), *dryrun).expect("An error occurred when runing operation")
 });
 
-fn visit(source: &Path, target: &Path, dryrun: bool, force: bool, backup: bool, unstow: bool, operations: LinkedList<FSOperation>) -> LinkedList<io::Result<FSOperation>> {
 
+
+fn visit(source: &Path, target: &Path, dryrun: bool, force: bool, backup: bool, unstow: bool, operations: Vec<FSOperation>) -> Vec<io::Result<FSOperation>> {
+
+
+    let mut current_operations: Vec<FSOperation> = Vec::new();
     if source.is_dir() {
         let source_paths = fs::read_dir(source).unwrap();
         for src_dir_entry in source_paths {
 
         }
-
     } else {
-
+        if unstow {
+            unstow::unstow_path(path.as_path(), target_file_path.as_path(), current_operations.borrow_mut())
+        } else {
+            stow::stow_path(path.as_path(), target_file_path.as_path(), force, backup, current_operations.borrow_mut())
+        }
     }
+    operations.extend(current_operations.iter().cloned());
+    current_operations
 }
 
-fn visit_run_sync(source: &Path, target: &Path, dryrun: bool, force: bool, backup: bool, unstow: bool) -> io::Result<()> {
+fn visit_and_apply(source: &Path, target: &Path, dryrun: bool, force: bool, backup: bool, unstow: bool) -> io::Result<()> {
     let source_paths = fs::read_dir(source).unwrap();
 
     let mut operations: LinkedList<FSOperation> = LinkedList::new();
@@ -103,7 +110,7 @@ fn visit_run_sync(source: &Path, target: &Path, dryrun: bool, force: bool, backu
             Ok(TraversOperation::StopPathRun) => (),
             Ok(TraversOperation::Continue) =>
                 if path.as_path().is_dir() {
-                    visit_run_sync(path.as_path(), target_file_path.as_path(), dryrun, force, backup, unstow);
+                    visit_and_apply(path.as_path(), target_file_path.as_path(), dryrun, force, backup, unstow);
                 },
             Err(e) => error!("{}", e)
         }
