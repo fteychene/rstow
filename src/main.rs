@@ -18,6 +18,9 @@ mod interpreters;
 mod fileutils;
 mod operations;
 
+#[cfg(test)]
+mod test_stow;
+
 use fileutils::*;
 use operations::FSOperation;
 use operations::TraversOperation;
@@ -63,31 +66,73 @@ main!(|args: Cli, log_level: verbosity| {
     info!("Stow from Source {:?} to target {:?}", source.display(), target.display());
 
 //    let mut operations: LinkedList<FSOperation> = LinkedList::new();
-    visit_and_apply(source.as_path(), target.as_path(), *dryrun, *force, *backup, *unstow).expect("An error occurred when visiting directories") ;
+//    visit_and_apply(source.as_path(), target.as_path(), *dryrun, *force, *backup, *unstow).expect("An error occurred when visiting directories") ;
 //    apply(operations.borrow_mut(), *dryrun).expect("An error occurred when runing operation")
+
+    let mut operations: LinkedList<io::Result<FSOperation>> = LinkedList::new();
+    visit(source.as_path(), target.as_path(), *force, *backup, *unstow, operations.borrow_mut()).expect("An error occurred when visiting directories");
+
+    for res_op in operations {
+        match res_op {
+            Ok(op) => println!("OK {:?}", op),
+            Err(e) => println!("ERR {:?}", e),
+        }
+    };
+
 });
 
 
+fn visit<'a, 'b, 'c>(source: &'a Path, target: &'b Path, force: bool, backup: bool, unstow: bool, operations: &'c mut LinkedList<io::Result<FSOperation>>) -> io::Result<()> {
 
-fn visit(source: &Path, target: &Path, dryrun: bool, force: bool, backup: bool, unstow: bool, operations: Vec<FSOperation>) -> Vec<io::Result<FSOperation>> {
-
-
-    let mut current_operations: Vec<FSOperation> = Vec::new();
     if source.is_dir() {
         let source_paths = fs::read_dir(source).unwrap();
         for src_dir_entry in source_paths {
+            let path = src_dir_entry.unwrap().path();
+            let target_file_path = target.join(path.as_path().file_name().expect("Unable to get path filename"));
 
+            let travers_result = visit_node(path.as_path(), target_file_path.as_path(), force, backup, unstow, operations.borrow_mut());
+            match travers_result {
+                Ok(TraversOperation::StopPathRun) => (),
+                Ok(TraversOperation::Continue) => {
+                    if path.as_path().is_dir() {
+                        visit(path.as_path(), target_file_path.as_path(), force, backup, unstow, operations.borrow_mut()).expect("trololo");
+                    }
+                },
+                Err(e) => error!("{}", e),
+            }
         }
     } else {
-        if unstow {
-            unstow::unstow_path(path.as_path(), target_file_path.as_path(), current_operations.borrow_mut())
-        } else {
-            stow::stow_path(path.as_path(), target_file_path.as_path(), force, backup, current_operations.borrow_mut())
-        }
+        visit_node(source, target, force, backup, unstow, operations.borrow_mut());
     }
-    operations.extend(current_operations.iter().cloned());
-    current_operations
+    Ok(())
 }
+
+fn visit_node<'a, 'b, 'c>(source: &'a Path, target: &'b Path, force: bool, backup: bool, unstow: bool, operations: &'c mut LinkedList<io::Result<FSOperation>>) -> io::Result<TraversOperation> {
+
+    let mut node_operations: LinkedList<FSOperation> = LinkedList::new();
+    let travers_result = {
+        if unstow {
+            unstow::unstow_path(source, target, node_operations.borrow_mut())
+        } else {
+            stow::stow_path(source, target, force, backup, node_operations.borrow_mut())
+        }
+    };
+
+    match travers_result {
+        Ok(travers_op) => {
+            for op in node_operations {
+                operations.push_back(Ok(op));
+            }
+            Ok(travers_op)
+        },
+        Err(e) => {
+            operations.push_back(Err(e));
+            Ok(TraversOperation::Continue)
+        },
+    }
+}
+
+
 
 fn visit_and_apply(source: &Path, target: &Path, dryrun: bool, force: bool, backup: bool, unstow: bool) -> io::Result<()> {
     let source_paths = fs::read_dir(source).unwrap();
