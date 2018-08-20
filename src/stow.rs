@@ -1,5 +1,6 @@
 
 use quicli::prelude::*;
+use quicli::prelude::warn;
 
 use std::io;
 use std::io::{Error, ErrorKind};

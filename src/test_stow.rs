@@ -38,16 +38,8 @@ fn test_basic_stow() {
     visit(source.as_path(), target.as_path(), force_flag, backup_flag, unstow_flag, operations.borrow_mut()).expect("An error occurred when visiting directories");
 
     let mut iter = operations.iter();
-    assert!(iter.next() == Some(Ok(FSOperation::CreateSymlink {source: source.join("file.txt"), target: target.join("file.txt")}).as_ref()) );
-//    assert!(iter.next().is_none());
 
-//    for res_op in operations {
-//        match res_op {
-//            Ok(op) => println!("OK {:?}", op),
-//            Err(e) => println!("ERR {:?}", e),
-//        }
-//    };
-
-    assert!(true);
+    let value = iter.next().unwrap().as_ref().unwrap();
+    assert!(value == &FSOperation::CreateSymlink { source: source.join("file.txt"), target: target.join("file.txt") });
     clear_directories();
 }
