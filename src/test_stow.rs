@@ -1,35 +1,15 @@
 use super::*;
 use std::fs::*;
 
-const TEST_SOURCE: &'static str = "/tmp/source";
-const TEST_TARGET: &'static str = "/tmp/target";
-
-fn build_source_target_directories() -> io::Result<()> {
-    println!("Create test directories");
-
-    let source: PathBuf = PathBuf::from(TEST_SOURCE);
-    let target: PathBuf = PathBuf::from(TEST_TARGET);
-    create_dir_all(source.as_path());
-    create_dir_all(target.as_path());
-    File::create(source.join("file.txt").as_path());
-    Ok(())
-}
-
-fn clear_directories() -> io::Result<()> {
-    println!("Clean test directories");
-    let source: PathBuf = PathBuf::from(TEST_SOURCE);
-    let target: PathBuf = PathBuf::from(TEST_TARGET);
-    remove_dir_all(target);
-    remove_dir_all(source);
-    Ok(())
-}
-
+#[cfg(test)]
+use test_utils::*;
 
 #[test]
 fn test_basic_stow() {
     build_source_target_directories();
     let source: PathBuf = PathBuf::from(TEST_SOURCE);
     let target: PathBuf = PathBuf::from(TEST_TARGET);
+    add_file_to("file.txt", &source);
     let force_flag = false;
     let backup_flag = false;
     let unstow_flag = false;

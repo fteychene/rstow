@@ -1,4 +1,3 @@
-
 use quicli::prelude::*;
 
 use std::io;
@@ -10,7 +9,7 @@ use fileutils::*;
 use operations::FSOperation;
 use operations::TraversOperation;
 
-pub fn stow_path<'a>(source_path: &'a Path, target_path: &'a Path, force: bool, backup: bool, operations: &'a mut LinkedList<FSOperation>) -> io::Result<TraversOperation> {
+pub(crate) fn stow_path<'a>(source_path: &'a Path, target_path: &'a Path, force: bool, backup: bool, operations: &'a mut LinkedList<FSOperation>) -> io::Result<TraversOperation> {
     let target_is_directory = source_path.is_dir();
     let target_exist = target_path.exists();
     let target_is_symlink = is_symlink(target_path);
@@ -49,18 +48,94 @@ pub fn stow_path<'a>(source_path: &'a Path, target_path: &'a Path, force: bool, 
             }
             operations.push_back(symlink_operation);
             Ok(TraversOperation::Continue)
-        },
+        }
         (true, false, false, false) => {
             // A real file already exist but force flag is not set => ERROR
             Err(Error::new(ErrorKind::Other, format!("Path {} already exist. Set -f flag to force override", target_path.display())))
-        },
+        }
         (true, false, true, _) => {
             //break for existing directory
             Ok(TraversOperation::Continue)
-        },
+        }
         (false, _, _, _) => {
             operations.push_back(symlink_operation);
             stop_if_directory()
         }
     }
+}
+
+
+#[cfg(test)]
+mod test_stow {
+    use super::*;
+    use test_utils::*;
+    use std::borrow::BorrowMut;
+
+    const NO_FORCE: bool = false;
+    const NO_BACKUP: bool = false;
+
+
+    #[test]
+    fn test_stow_file() {
+        with_test_directories(|source: &PathBuf, target: &PathBuf| {
+            let source_file = add_file_to("file.txt", source).unwrap();
+            let target_file = target.join("file.txt");
+
+            let mut operations: LinkedList<FSOperation> = LinkedList::new();
+            let result = stow_path(source_file.as_path(), target_file.as_path(), NO_FORCE, NO_BACKUP, operations.borrow_mut()).expect("An error occurred when visiting directories");
+
+            assert_eq!(result, TraversOperation::Continue);
+
+            let mut iter = operations.iter();
+            let value = iter.next().unwrap();
+            assert_eq!(value, &FSOperation::CreateSymlink { source: source_file, target: target_file });
+        });
+    }
+
+    #[test]
+    fn test_stow_directory() {
+        with_test_directories(|source: &PathBuf, target: &PathBuf| {
+            let source_dir = add_directory_to("subDir", source).unwrap();
+            let target_dir = target.join("subDir");
+
+            let mut operations: LinkedList<FSOperation> = LinkedList::new();
+            let result = stow_path(source_dir.as_path(), target_dir.as_path(), NO_FORCE, NO_BACKUP, operations.borrow_mut()).expect("An error occurred when visiting directories");
+
+            assert_eq!(result, TraversOperation::StopPathRun);
+
+            let mut iter = operations.iter();
+            let value = iter.next().unwrap();
+            assert_eq!(value, &FSOperation::CreateSymlink { source: source_dir, target: target_dir });
+        });
+    }
+
+    #[test]
+    fn test_stow_existing_file() {
+        with_test_directories(|source: &PathBuf, target: &PathBuf| {
+            let source_file = add_file_to("file.txt", source).unwrap();
+            let target_file = add_file_to("file.txt", target).unwrap();
+
+            let mut operations: LinkedList<FSOperation> = LinkedList::new();
+            let result = stow_path(source_file.as_path(), target_file.as_path(), NO_FORCE, NO_BACKUP, operations.borrow_mut());
+
+            // return an error
+            assert!(result.is_err());
+            assert!(operations.is_empty());
+        });
+    }
+
+//    #[test]
+//    fn test_stow_existing_directory() {
+//        with_test_directories(|source: &PathBuf, target: &PathBuf| {
+//            let source_file = add_directory_to("subDir", source).unwrap();
+//            let target_file = add_directory_to("subDir", target).unwrap();
+//
+//            let mut operations: LinkedList<FSOperation> = LinkedList::new();
+//            let result = stow_path(source_file.as_path(), target_file.as_path(), NO_FORCE, NO_BACKUP, operations.borrow_mut());
+//
+//            // return an error
+//            assert!(result.is_err());
+//            assert!(operations.is_empty());
+//        });
+//    }
 }

@@ -21,6 +21,9 @@ mod operations;
 #[cfg(test)]
 mod test_stow;
 
+#[cfg(test)]
+mod test_utils;
+
 use fileutils::*;
 use operations::FSOperation;
 use operations::TraversOperation;
@@ -133,7 +136,7 @@ fn visit_node<'a, 'b, 'c>(source: &'a Path, target: &'b Path, force: bool, backu
 }
 
 
-
+#[deprecated]
 fn visit_and_apply(source: &Path, target: &Path, dryrun: bool, force: bool, backup: bool, unstow: bool) -> io::Result<()> {
     let source_paths = fs::read_dir(source).unwrap();
 
