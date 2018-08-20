@@ -1,6 +1,5 @@
 
 use quicli::prelude::*;
-use quicli::prelude::warn;
 
 use std::io;
 use std::io::{Error, ErrorKind};
@@ -35,7 +34,7 @@ pub fn stow_path<'a>(source_path: &'a Path, target_path: &'a Path, force: bool, 
                 info!("Valid symlink {} already exist, nothing to do", target_path.display());
                 Ok(TraversOperation::StopPathRun)
             } else {
-                warn!("Path symlink {} already exist and will be override", target_path.display());
+                log!(Level::Warn, "Path symlink {} already exist and will be override", target_path.display());
                 operations.push_back(symlink_operation);
                 stop_if_directory()
             }
@@ -45,7 +44,7 @@ pub fn stow_path<'a>(source_path: &'a Path, target_path: &'a Path, force: bool, 
             if backup {
                 operations.push_back(FSOperation::Backup(target_path.to_path_buf()));
             } else {
-                warn!("Path {} already exist and will be override !", target_path.display());
+                log!(Level::Warn, "Path {} already exist and will be override !", target_path.display());
                 operations.push_back(FSOperation::Delete(target_path.to_path_buf()));
             }
             operations.push_back(symlink_operation);
