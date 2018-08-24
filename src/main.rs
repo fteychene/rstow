@@ -23,9 +23,6 @@ mod fileutils;
 mod operations;
 mod errors;
 
-//#[cfg(test)]
-//mod test_stow;
-
 #[cfg(test)]
 mod test_utils;
 
